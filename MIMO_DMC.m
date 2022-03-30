@@ -6,7 +6,7 @@ clearvars
 clc;
 
 %% Model simulation (MIMO state space model)
-A = [-2,1;1,-1];
+A = [-2,1;1,-4];
 B = [5,0;0,2];
 C = [1,0;0,1];
 D = [1,1;2,1];
@@ -148,7 +148,7 @@ function [x1, y1] = RKsolver(sys, u, x0, Ts)
     A = sys.A; B = sys.B;
     C = sys.C; D = sys.D;
     F = @(t, x) A*x + B*u;
-    [t, X_tmp] = ode45(F, [0, Ts], x0);
+    [~, X_tmp] = ode45(F, [0, Ts], x0);
 %     plot(t, X_tmp)
     x1 = X_tmp(end,:)';
     y1 = C*x1 + D*u;
