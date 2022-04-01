@@ -6,13 +6,15 @@ clearvars
 clc;
 
 %% Model simulation (MIMO state space model)
-A = [-2,1;1,-4];
-B = [5,0;0,2];
-C = [1,0;0,1];
-D = [1,1;2,1];
+A_sys = [-2,-1;6,-4];
+B_sys = [4,-2;6,3];
+C_sys = [1,0;0,1];
+D_sys = [-1,-2;-1,1];
 
-sys = ss(A,B,C,D);
-step(sys, 0:1:50);
+sys = ss(A_sys,B_sys,C_sys,D_sys);
+step(sys, 0:0.1: 50*0.1)
+grid on
+grid minor
 
 %% Initialise parameters
 Ts = 0.1; % Sampling time
@@ -58,14 +60,13 @@ for i = 1: P
         end
     end
 end
-
 A = [A11, A12; A21, A22];  
 AN = [a11, a12; a21, a22];
 
 % weight for system error and input (here we penalise the error more)
-Q_arg = [1 5]; % weight for system error
-R_arg = [3 4]; % weight for control input
-Out_ref = [20 5]; % reference of the output
+Q_arg = [3 4]; % weight for system error
+R_arg = [5 5]; % weight for control input
+Out_ref = [5 10]; % reference of the output
 wr = zeros(nOut * P, 1);
 
 % Construct wr & Q & S & R & L
@@ -96,12 +97,15 @@ D = L / (A'*Q*A+R)*A'*Q;
 
 %% MIMO DMC loop
 
-t_sim = 100.0; % Simulate for 20s
+t_sim = 15.0; % Simulation time
 mpc_time = 0.0;
 u = [0;0]; % Control signal
 X_curr = [0;0]; % initial state
 
-Y_array = X_curr; % Store output for plotting
+Y_array = C_sys*X_curr + D_sys*u; % Store output for plotting
+Y1_min = Y_array(1); Y1_max = Y_array(1); 
+Y2_min = Y_array(2); Y2_max = Y_array(2); 
+u_array = [0;0];
 figure
 
 while(mpc_time < t_sim)
@@ -113,30 +117,57 @@ while(mpc_time < t_sim)
     YN1 = YN + AN * du;
     Y1 = [YN1(1);YN1(N+1)]; % The current estimation after control input
     
+    Y1_min = min(Y1(1), Y1_min); Y1_max = max(Y1(1), Y1_max);
+    Y2_min = min(Y1(2), Y2_min); Y2_max = max(Y1(2), Y2_max);
+
     u = u + du;
     [X_curr, Y_curr] = RKsolver(sys, u, X_curr, Ts);
     e1 = X_curr - Y1; % calculate the error with the real output
     Y_cor = YN1 + H*e1;
     YN = S * Y_cor;
+
     Y_array = [Y_array, [YN(1);YN(N+1)]];
+    u_array = [u_array, u];
     mpc_time = mpc_time + Ts;
 
     %% visualise by step
-    subplot(1,2,1)
+    subplot(2,2,2)
     plot(linspace(0, mpc_time, size(Y_array,2)), Y_array(1,:), 'b-');
+    ylim([Y1_min - 0.4*(Y1_max - Y1_min), Y1_max + 0.4*(Y1_max - Y1_min)])
     grid on
     grid minor
     yline(Out_ref(1), 'r--', 'Reference')
     xlabel('{t} (sec)');
-    ylabel('Output value');
-    drawnow
-    subplot(1,2,2)
-    plot(linspace(0, mpc_time, size(Y_array,2)), Y_array(2,:), 'b-');
+    ylabel('Output value {y_1}');
+    title('Output {y_1} overtime')
+
+    subplot(2,2,1)
+    plot(linspace(0, mpc_time, size(Y_array,2)), u_array(1,:),"Color",'#D95319');
     grid on
     grid minor
     xlabel('{t} (sec)');
-    ylabel('Output value');
+    ylabel('Input {u_1}');
+    title('Input {u_1} overtime')
+
+    subplot(2,2,4)
+    plot(linspace(0, mpc_time, size(Y_array,2)), Y_array(2,:), 'b-');
+    ylim([Y2_min - 0.4*(Y2_max - Y2_min), Y2_max + 0.4*(Y2_max - Y2_min)])
+    grid on
+    grid minor
+    xlabel('{t} (sec)');
+    ylabel('Output value {y_2}');
     yline(Out_ref(2),'r--','Reference')
+    title('Output {y_2} overtime')
+
+    subplot(2,2,3)
+    plot(linspace(0, mpc_time, size(Y_array,2)), u_array(2,:), "Color",'#D95319');
+    grid on
+    grid minor
+    xlabel('{t} (sec)');
+    ylabel('Input {u_2}');
+    title('Input {u_2} overtime')
+
+    drawnow
 end
 
 %% Runge-Kutta method for simulation
