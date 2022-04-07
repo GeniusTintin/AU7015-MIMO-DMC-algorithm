@@ -2,3 +2,4 @@
 test.m
 *.backup
 *.asv
+*.DS_Store
